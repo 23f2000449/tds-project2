@@ -7,9 +7,16 @@ __pycache__/
 # Virtual environment
 venv/
 
+# Environment variables & config
+.env
+
 # OS files
 .DS_Store
 Thumbs.db
 
-# Test scripts (optional)
+# Test scripts (optional for deployment)
 test_endpoints.py
+
+# IDE/project settings
+.vscode/
+.idea/

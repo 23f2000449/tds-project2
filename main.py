@@ -4,7 +4,7 @@ from fastapi.encoders import jsonable_encoder
 from importlib import import_module
 import os
 
-# Standard FastAPI app name
+# Standard FastAPI app variable
 app = FastAPI()
 
 def create_endpoint_func(mod):
@@ -42,4 +42,11 @@ def register_handlers(app):
             print(f"Registering endpoint: {endpoint}")
             app.add_api_route(endpoint, create_endpoint_func(mod), methods=["GET", "POST"])
 
+# Register all endpoints
 register_handlers(app)
+
+# Allow running locally via `python main.py`
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8000))  # Railway injects PORT
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
