@@ -41,6 +41,7 @@ Minimal `requirements.txt`:
 ```
 fastapi==0.111.0
 uvicorn==0.30.1
+requests==2.32.3
 ```
 
 ---
