@@ -1,0 +1,104 @@
+[
+  {
+    "title": "Python (programming language)",
+    "summary": "Python is a high-level, interpreted programming language known for its readability and dynamic typing. Created by Guido van Rossum and first released in 1991, Python emphasizes code simplicity and supports multiple programming paradigms, including procedural, object-oriented, and functional programming.",
+    "categories": ["High-level programming languages", "Programming languages", "Python"],
+    "images": [
+      "https://upload.wikimedia.org/wikipedia/commons/c/c3/Python-logo-notext.svg",
+      "https://upload.wikimedia.org/wikipedia/en/c/c1/Guido_van_Rossum.jpg"
+    ],
+    "links": ["Guido van Rossum", "Java (programming language)", "C++", "Artificial intelligence", "Machine learning"]
+  },
+  {
+    "title": "Guido van Rossum",
+    "summary": "Guido van Rossum is a Dutch programmer best known as the creator of the Python programming language. He developed Python in 1991 while working at Centrum Wiskunde & Informatica (CWI) in the Netherlands.",
+    "categories": ["Computer programmers", "Dutch people", "Python"],
+    "images": [
+      "https://upload.wikimedia.org/wikipedia/commons/6/66/Guido_van_Rossum_OSCON_2006.jpg"
+    ],
+    "links": ["Python (programming language)", "CWI", "Netherlands"]
+  },
+  {
+    "title": "Java (programming language)",
+    "summary": "Java is a high-level, class-based, object-oriented programming language designed to have as few implementation dependencies as possible. Developed by Sun Microsystems in 1995, it is one of the most popular languages used today.",
+    "categories": ["Programming languages", "High-level programming languages", "Java platform"],
+    "images": [
+      "https://upload.wikimedia.org/wikipedia/en/3/30/Java_programming_language_logo.svg"
+    ],
+    "links": ["Python (programming language)", "C++", "Object-oriented programming", "Virtual machine"]
+  },
+  {
+    "title": "C++",
+    "summary": "C++ is a general-purpose programming language created by Bjarne Stroustrup as an extension of the C programming language. It offers facilities for low-level memory manipulation and object-oriented programming.",
+    "categories": ["Programming languages", "Systems programming languages", "C++"],
+    "images": [
+      "https://upload.wikimedia.org/wikipedia/commons/1/18/ISO_C%2B%2B_Logo.svg"
+    ],
+    "links": ["Java (programming language)", "Python (programming language)", "Bjarne Stroustrup", "Object-oriented programming"]
+  },
+  {
+    "title": "Artificial intelligence",
+    "summary": "Artificial intelligence (AI) is intelligence demonstrated by machines, as opposed to the natural intelligence displayed by animals and humans. AI research has produced new approaches to problem solving, reasoning, and perception.",
+    "categories": ["Artificial intelligence", "Computer science", "Machine learning"],
+    "images": [
+      "https://upload.wikimedia.org/wikipedia/commons/6/6f/Artificial_Intelligence_logo_notext.svg"
+    ],
+    "links": ["Machine learning", "Deep learning", "Neural network"]
+  },
+  {
+    "title": "Machine learning",
+    "summary": "Machine learning (ML) is a subset of artificial intelligence that enables computers to learn from data without explicit programming. It is widely used in recommendation systems, computer vision, and natural language processing.",
+    "categories": ["Machine learning", "Artificial intelligence", "Computer science"],
+    "images": [
+      "https://upload.wikimedia.org/wikipedia/commons/4/44/Machine_learning_logo.svg"
+    ],
+    "links": ["Artificial intelligence", "Deep learning", "Python (programming language)"]
+  },
+  {
+    "title": "Deep learning",
+    "summary": "Deep learning is a subset of machine learning that uses neural networks with many layers to model complex patterns in data. It is especially effective in image recognition, speech recognition, and natural language processing.",
+    "categories": ["Deep learning", "Machine learning", "Artificial intelligence"],
+    "images": [
+      "https://upload.wikimedia.org/wikipedia/commons/3/3e/Deep_learning_logo.svg"
+    ],
+    "links": ["Machine learning", "Neural network", "Python (programming language)"]
+  },
+  {
+    "title": "Neural network",
+    "summary": "A neural network is a computational model inspired by the human brain's network of neurons. It is a core component of deep learning systems.",
+    "categories": ["Neural networks", "Machine learning", "Artificial intelligence"],
+    "images": [
+      "https://upload.wikimedia.org/wikipedia/commons/4/46/Neural_network_logo.svg"
+    ],
+    "links": ["Deep learning", "Machine learning", "Artificial intelligence"]
+  },
+  {
+    "title": "Object-oriented programming",
+    "summary": "Object-oriented programming (OOP) is a programming paradigm based on the concept of 'objects', which can contain data and code that manipulates the data.",
+    "categories": ["Programming paradigms", "Object-oriented programming"],
+    "images": [
+      "https://upload.wikimedia.org/wikipedia/commons/3/3b/OOP_concept_diagram.svg"
+    ],
+    "links": ["Java (programming language)", "C++", "Python (programming language)"]
+  },
+  {
+    "title": "Virtual machine",
+    "summary": "A virtual machine (VM) is a software emulation of a physical computer that runs an operating system and applications as if it were a physical machine.",
+    "categories": ["Virtual machines", "Computer science"],
+    "images": [
+      "https://upload.wikimedia.org/wikipedia/commons/5/55/Virtual_machine_icon.svg"
+    ],
+    "links": ["Java (programming language)", "Python (programming language)"]
+  },
+
+{
+  "title": "CWI",
+  "summary": "Centrum Wiskunde & Informatica (CWI) is a research institute in the Netherlands focusing on mathematics and computer science. It is where Guido van Rossum developed Python.",
+  "categories": ["Research institutes", "Computer science", "Netherlands"],
+  "images": [
+    "https://upload.wikimedia.org/wikipedia/commons/2/2c/CWI_logo.svg"
+  ],
+  "links": ["Guido van Rossum", "Python (programming language)", "Netherlands"]
+}
+
+]
