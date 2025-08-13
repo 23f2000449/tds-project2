@@ -3,6 +3,9 @@ from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 from importlib import import_module
 import os
+import tempfile
+from handlers.weather import analyze_weather
+from fastapi import UploadFile, File
 
 # Standard FastAPI app variable
 app = FastAPI()
@@ -50,3 +53,17 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))  # Railway injects PORT
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
+
+@app.post("/analyze-weather")
+async def analyze_weather_endpoint(file: UploadFile = File(...)):
+    # Save uploaded file temporarily
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as tmp:
+        tmp.write(await file.read())
+        tmp_path = tmp.name
+
+    result = analyze_weather(tmp_path)
+
+    # Clean up temp file
+    os.remove(tmp_path)
+
+    return result
