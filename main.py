@@ -1,11 +1,15 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
+import matplotlib
+matplotlib.use("Agg")  
 from importlib import import_module
 import os
 import tempfile
 from handlers.weather import analyze_weather
 from fastapi import UploadFile, File
+from handlers.network import fastapi_router  # <-- Added import
+from handlers import sales  # <-- NEW import
 
 # Standard FastAPI app variable
 app = FastAPI()
@@ -48,6 +52,12 @@ def register_handlers(app):
 # Register all endpoints
 register_handlers(app)
 
+# Explicitly include sales router
+app.include_router(sales.router, tags=["sales"])  # <-- NEW line
+
+# Add the evaluation endpoint
+app.include_router(fastapi_router(), tags=["eval"])  # <-- Already there
+
 # Allow running locally via `python main.py`
 if __name__ == "__main__":
     import uvicorn
@@ -67,3 +77,9 @@ async def analyze_weather_endpoint(file: UploadFile = File(...)):
     os.remove(tmp_path)
 
     return result
+
+from handlers.network import analyze_network
+
+@app.post("/analyze-network")
+async def analyze_network_endpoint():
+    return analyze_network()

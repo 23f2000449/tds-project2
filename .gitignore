@@ -6,6 +6,7 @@ __pycache__/
 
 # Virtual environment
 venv/
+.venv/
 
 # Environment variables & config
 .env
@@ -16,6 +17,7 @@ Thumbs.db
 
 # Test scripts (optional for deployment)
 test_endpoints.py
+run.py
 
 # IDE/project settings
 .vscode/

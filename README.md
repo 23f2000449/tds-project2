@@ -20,7 +20,12 @@ It serves information from a pre-loaded `wikipedia.json` dataset without requiri
 - `/related?title=...` – Articles linked from the given one
 - `/top_categories?limit=N` – Most frequent categories
 
-> **Note:** All data is served from `data/wikipedia.json` (no live Wikipedia calls).
+### 📊 Analysis Endpoints (New)
+- `/analyze-weather` – Upload a weather CSV and analyze temperature/precipitation trends.
+- `/analyze-network` – Analyze a social network graph from `edges.csv`.
+- `/analyze-sales` – Analyze sales data from `sample-sales.csv`.
+
+> **Note:** All data is served from local files (`data/wikipedia.json`, `sample-weather.csv`, `edges.csv`, `sample-sales.csv`) — no live API calls.
 
 ---
 
@@ -37,19 +42,12 @@ Use **Python 3.8+**.
 pip install -r requirements.txt
 ```
 
-Minimal `requirements.txt`:
-```
-fastapi==0.111.0
-uvicorn==0.30.1
-requests==2.32.3
-```
-
 ---
 
 ## 🚀 Running the Server
 From the project root:
 ```bash
-python -m uvicorn main:myapp --reload
+uvicorn main:app --reload
 ```
 Server will start at:  
 ```
@@ -89,30 +87,60 @@ Example Response:
 
 ---
 
-### Summary
+### Analyze Weather
 ```bash
-GET /summary?title=Python%20(programming%20language)
+POST /analyze-weather
 ```
+Upload `sample-weather.csv`.  
 Example Response:
 ```json
 {
-  "title": "Python (programming language)",
-  "summary": "Python is an interpreted, high-level, general-purpose programming language..."
+  "average_temp_c": 21.5,
+  "max_precip_date": "2025-01-04",
+  "min_temp_c": 19.9,
+  "temp_precip_correlation": -0.69,
+  "average_precip_mm": 1.54,
+  "temp_line_chart": "<base64 string>"
 }
 ```
 
 ---
 
-### Related
+### Analyze Sales
 ```bash
-GET /related?title=Python%20(programming%20language)
+POST /analyze-sales
+```
+Upload `sample-sales.csv`.  
+Example Response:
+```json
+{
+  "total_sales": 1690.0,
+  "top_region": "West",
+  "day_sales_correlation": -0.37,
+  "bar_chart": "<base64 string>",
+  "median_sales": 90.0,
+  "total_sales_tax": 169.0,
+  "cumulative_sales_chart": "<base64 string>"
+}
 ```
 
 ---
 
-### Top Categories
+### Analyze Network
 ```bash
-GET /top_categories?limit=5
+POST /analyze-network
+```
+Uses `edges.csv`.  
+Example Response:
+```json
+{
+  "edge_count": 7,
+  "highest_degree_node": "Bob",
+  "average_degree": 2.8,
+  "density": 0.7,
+  "shortest_path_alice_eve": 2,
+  "network_graph": "<base64 string>"
+}
 ```
 
 ---
@@ -132,27 +160,35 @@ project2/
 │   ├── categories.py
 │   ├── images.py
 │   ├── links.py
+│   ├── network.py
 │   ├── random.py
 │   ├── related.py
 │   ├── root.py
+│   ├── sales.py
 │   ├── search.py
 │   ├── stats.py
 │   ├── summary.py
 │   ├── top_categories.py
+│   ├── weather.py
 │   └── __init__.py
 │
 ├── utils/
 │   ├── wikipedia_loader.py
 │   ├── wikipedia_parser.py
 │   └── __init__.py
+│
+├── sample-weather.csv
+├── sample-sales.csv
+├── edges.csv
 ```
 
 ---
 
 ## 📊 Dataset
-- Small, rich subset of Wikipedia articles.
-- Interconnected via `links` for `/related` functionality.
-- Local only — **no internet required**.
+- `data/wikipedia.json`: Wikipedia subset dataset
+- `sample-weather.csv`: Example weather data
+- `sample-sales.csv`: Example sales data
+- `edges.csv`: Example social network
 
 ---
 
@@ -163,13 +199,4 @@ project2/
 
 ---
 
-## 📝 Submission Instructions
-For **grading**:
-1. Push this project to a **public GitHub repository**.
-2. Deploy the API to your preferred hosting (if required by grader).
-3. Submit both:
-   - **GitHub Repository Link**
-   - **Deployed API Endpoint URL**
-   
-Submission Portal:  
-[https://exam.sanand.workers.dev/tds-data-analyst-agent](https://exam.sanand.workers.dev/tds-data-analyst-agent)
+
