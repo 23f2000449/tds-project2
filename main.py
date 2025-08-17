@@ -8,7 +8,6 @@ import os
 import tempfile
 from handlers.weather import analyze_weather
 from fastapi import UploadFile, File
-from handlers.network import fastapi_router  # <-- Added import
 from handlers import sales  # <-- NEW import
 
 # Standard FastAPI app variable
@@ -54,9 +53,6 @@ register_handlers(app)
 
 # Explicitly include sales router
 app.include_router(sales.router, tags=["sales"])  # <-- NEW line
-
-# Add the evaluation endpoint
-app.include_router(fastapi_router(), tags=["eval"])  # <-- Already there
 
 # Allow running locally via `python main.py`
 if __name__ == "__main__":
