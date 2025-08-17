@@ -78,8 +78,9 @@ async def analyze_weather_endpoint(file: UploadFile = File(...)):
 
     return result
 
-from handlers.network import analyze_network
+from handlers import sales
+from handlers.network import router as network_router
 
-@app.post("/analyze-network")
-async def analyze_network_endpoint():
-    return analyze_network()
+app.include_router(sales.router, tags=["sales"])
+app.include_router(network_router, tags=["network"])
+
