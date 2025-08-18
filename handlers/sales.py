@@ -1,58 +1,55 @@
-import io
-import base64
+# handlers/sales.py
 import pandas as pd
+import matplotlib
+matplotlib.use("Agg")  # headless backend
 import matplotlib.pyplot as plt
-from fastapi import APIRouter, UploadFile, File
+import base64
+from io import BytesIO
 
-router = APIRouter()
-
-def fig_to_base64(fig):
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", bbox_inches="tight")
+def _plot_to_base64(fig, max_kb: int = 100) -> str:
+    """Convert matplotlib figure to base64 PNG under max_kb."""
+    for dpi in (120, 100, 90, 80, 70, 60):
+        buf = BytesIO()
+        fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight", pad_inches=0.1)
+        data = buf.getvalue()
+        if len(data) <= max_kb * 1024:
+            plt.close(fig)
+            return base64.b64encode(data).decode("utf-8")
     plt.close(fig)
-    buf.seek(0)
-    img_base64 = base64.b64encode(buf.read()).decode("utf-8")
-    return img_base64
+    return base64.b64encode(data).decode("utf-8")
 
-@router.post("/analyze-sales")
-async def analyze_sales(file: UploadFile = File(...)):
-    df = pd.read_csv(file.file)
+def analyze_sales(csv_path: str) -> dict:
+    df = pd.read_csv(csv_path, parse_dates=["date"])
 
-    # Required columns — assume CSV is valid for portal
-    df["date"] = pd.to_datetime(df["date"])
+    total_revenue = (df["units_sold"] * df["unit_price"]).sum()
+    best_product = df.groupby("product")["units_sold"].sum().idxmax()
+    avg_units_per_day = df.groupby("date")["units_sold"].sum().mean()
+    daily_revenue = (df.groupby("date")
+                       .apply(lambda g: (g["units_sold"] * g["unit_price"]).sum())
+                       .mean())
 
-    total_sales = df["sales"].sum()
-    region_sales = df.groupby("region")["sales"].sum()
-    top_region = region_sales.idxmax()
-    df["day"] = df["date"].dt.day
-    day_sales_correlation = df["day"].corr(df["sales"])
-    median_sales = df["sales"].median()
-    total_sales_tax = total_sales * 0.10
-
-    # Bar chart: total sales by region
+    # --- Bar chart: Total units sold per product ---
     fig1, ax1 = plt.subplots()
-    region_sales.plot(kind="bar", color="blue", ax=ax1)
-    ax1.set_title("Total Sales by Region")
-    ax1.set_xlabel("Region")
-    ax1.set_ylabel("Sales")
-    bar_chart = fig_to_base64(fig1)
+    df.groupby("product")["units_sold"].sum().plot(kind="bar", ax=ax1, color="skyblue")
+    ax1.set_xlabel("Product")
+    ax1.set_ylabel("Units Sold")
+    ax1.set_title("Units Sold per Product")
+    product_bar_chart = _plot_to_base64(fig1)
 
-    # Line chart: cumulative sales over time
-    df_sorted = df.sort_values("date")
-    df_sorted["cumulative_sales"] = df_sorted["sales"].cumsum()
+    # --- Line chart: Daily revenue over time ---
     fig2, ax2 = plt.subplots()
-    ax2.plot(df_sorted["date"], df_sorted["cumulative_sales"], color="red")
-    ax2.set_title("Cumulative Sales Over Time")
+    revenue_by_date = df.groupby("date").apply(lambda g: (g["units_sold"] * g["unit_price"]).sum())
+    ax2.plot(revenue_by_date.index, revenue_by_date.values, color="green")
     ax2.set_xlabel("Date")
-    ax2.set_ylabel("Cumulative Sales")
-    cumulative_sales_chart = fig_to_base64(fig2)
+    ax2.set_ylabel("Revenue")
+    ax2.set_title("Revenue Over Time")
+    revenue_line_chart = _plot_to_base64(fig2)
 
     return {
-        "total_sales": float(total_sales),
-        "top_region": str(top_region),
-        "day_sales_correlation": float(day_sales_correlation),
-        "median_sales": float(median_sales),
-        "total_sales_tax": float(total_sales_tax),
-        "bar_chart": "data:image/png;base64," + bar_chart,
-        "cumulative_sales_chart": "data:image/png;base64," + cumulative_sales_chart,
+        "total_revenue": round(float(total_revenue), 2),
+        "best_selling_product": str(best_product),
+        "average_daily_units_sold": round(float(avg_units_per_day), 2),
+        "average_daily_revenue": round(float(daily_revenue), 2),
+        "product_bar_chart": product_bar_chart,
+        "revenue_line_chart": revenue_line_chart,
     }
