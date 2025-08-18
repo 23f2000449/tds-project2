@@ -4,13 +4,10 @@ import tempfile
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse
 
-import matplotlib
-matplotlib.use("Agg")  # headless backend for image generation
-
-# Import your handlers directly
+# Import explicit handler functions
 from handlers.weather import analyze_weather
 from handlers.sales import analyze_sales
-from handlers.network import analyze_network_from_path
+from handlers.network import analyze_network
 
 app = FastAPI(title="TDS Project – Data Analyst Agent API")
 
@@ -26,45 +23,50 @@ def root():
         ],
     }
 
-
-def _save_upload_to_temp(upload: UploadFile, suffix: str = ".csv") -> str:
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        tmp.write(upload.file.read())
-        return tmp.name
-
+def _save_upload(upload: UploadFile, suffix: str = ".csv") -> str:
+    """Save uploaded file to a temporary file and return its path."""
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp.write(upload.file.read())
+            return tmp.name
+    finally:
+        try:
+            upload.file.close()
+        except Exception:
+            pass
 
 @app.post("/analyze-weather")
 async def analyze_weather_endpoint(file: UploadFile = File(...)):
     if file.content_type and "csv" not in file.content_type:
-        raise HTTPException(status_code=400, detail="Please upload a CSV file.")
-    path = _save_upload_to_temp(file)
+        raise HTTPException(status_code=400, detail="Upload must be a CSV file")
+    path = _save_upload(file, suffix=".csv")
     try:
         result = analyze_weather(path)
         return JSONResponse(content=result)
     finally:
         os.remove(path)
 
-
 @app.post("/analyze-sales")
 async def analyze_sales_endpoint(file: UploadFile = File(...)):
     if file.content_type and "csv" not in file.content_type:
-        raise HTTPException(status_code=400, detail="Please upload a CSV file.")
-    # Here we just pass the UploadFile directly since your sales handler consumes file.file
-    result = await analyze_sales(file)
-    return JSONResponse(content=result)
-
-
-@app.post("/analyze-network")
-async def analyze_network_endpoint(file: UploadFile = File(...)):
-    if file.content_type and "csv" not in file.content_type:
-        raise HTTPException(status_code=400, detail="Please upload a CSV file.")
-    path = _save_upload_to_temp(file)
+        raise HTTPException(status_code=400, detail="Upload must be a CSV file")
+    path = _save_upload(file, suffix=".csv")
     try:
-        result = analyze_network_from_path(path)
+        result = analyze_sales(path)
         return JSONResponse(content=result)
     finally:
         os.remove(path)
 
+@app.post("/analyze-network")
+async def analyze_network_endpoint(file: UploadFile = File(...)):
+    if file.content_type and "csv" not in file.content_type:
+        raise HTTPException(status_code=400, detail="Upload must be a CSV file")
+    path = _save_upload(file, suffix=".csv")
+    try:
+        result = analyze_network(path)
+        return JSONResponse(content=result)
+    finally:
+        os.remove(path)
 
 if __name__ == "__main__":
     import uvicorn
