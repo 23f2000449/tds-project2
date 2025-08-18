@@ -42,6 +42,6 @@ def analyze_weather(csv_path):
         "min_temp_c": float(round(min_temp, 2)),
         "temp_precip_correlation": float(round(correlation, 10)),
         "average_precip_mm": float(round(avg_precip, 2)),
-        "temp_line_chart": str(temp_line_chart),
-        "precip_histogram": str(precip_histogram)
+        "temp_line_chart": "data:image/png;base64," + temp_line_chart,
+        "precip_histogram": "data:image/png;base64," + precip_histogram
     }
