@@ -1,55 +1,48 @@
 # handlers/sales.py
 import pandas as pd
-import matplotlib
-matplotlib.use("Agg")  # headless backend
 import matplotlib.pyplot as plt
 import base64
-from io import BytesIO
+import io
+import os
 
-def _plot_to_base64(fig, max_kb: int = 100) -> str:
-    """Convert matplotlib figure to base64 PNG under max_kb."""
-    for dpi in (120, 100, 90, 80, 70, 60):
-        buf = BytesIO()
-        fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight", pad_inches=0.1)
-        data = buf.getvalue()
-        if len(data) <= max_kb * 1024:
-            plt.close(fig)
-            return base64.b64encode(data).decode("utf-8")
+def _fig_to_base64(fig):
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", bbox_inches="tight")
     plt.close(fig)
-    return base64.b64encode(data).decode("utf-8")
+    return base64.b64encode(buf.getvalue()).decode("utf-8")
 
-def analyze_sales(csv_path: str) -> dict:
-    df = pd.read_csv(csv_path, parse_dates=["date"])
+def analyze_sales(csv_path: str):
+    df = pd.read_csv(csv_path)
 
-    total_revenue = (df["units_sold"] * df["unit_price"]).sum()
-    best_product = df.groupby("product")["units_sold"].sum().idxmax()
-    avg_units_per_day = df.groupby("date")["units_sold"].sum().mean()
-    daily_revenue = (df.groupby("date")
-                       .apply(lambda g: (g["units_sold"] * g["unit_price"]).sum())
-                       .mean())
+    # Ensure required columns
+    if not {"date", "region", "sales"}.issubset(df.columns):
+        raise ValueError("Sales CSV must contain columns: date, region, sales")
 
-    # --- Bar chart: Total units sold per product ---
-    fig1, ax1 = plt.subplots()
-    df.groupby("product")["units_sold"].sum().plot(kind="bar", ax=ax1, color="skyblue")
-    ax1.set_xlabel("Product")
-    ax1.set_ylabel("Units Sold")
-    ax1.set_title("Units Sold per Product")
-    product_bar_chart = _plot_to_base64(fig1)
+    df["date"] = pd.to_datetime(df["date"])
+    total_sales = float(df["sales"].sum())
+    avg_sales = float(df["sales"].mean())
+    best_region = df.groupby("region")["sales"].sum().idxmax()
 
-    # --- Line chart: Daily revenue over time ---
-    fig2, ax2 = plt.subplots()
-    revenue_by_date = df.groupby("date").apply(lambda g: (g["units_sold"] * g["unit_price"]).sum())
-    ax2.plot(revenue_by_date.index, revenue_by_date.values, color="green")
-    ax2.set_xlabel("Date")
-    ax2.set_ylabel("Revenue")
-    ax2.set_title("Revenue Over Time")
-    revenue_line_chart = _plot_to_base64(fig2)
+    # Sales trend line chart
+    fig, ax = plt.subplots()
+    df.groupby("date")["sales"].sum().plot(ax=ax, marker="o", color="blue")
+    ax.set_title("Sales Trend")
+    ax.set_xlabel("Date")
+    ax.set_ylabel("Total Sales")
+    sales_trend_chart = _fig_to_base64(fig)
+
+    # Regional sales bar chart
+    fig, ax = plt.subplots()
+    df.groupby("region")["sales"].sum().plot(kind="bar", ax=ax, color="green")
+    ax.set_title("Regional Sales")
+    ax.set_xlabel("Region")
+    ax.set_ylabel("Sales")
+    regional_sales_chart = _fig_to_base64(fig)
 
     return {
-        "total_revenue": round(float(total_revenue), 2),
-        "best_selling_product": str(best_product),
-        "average_daily_units_sold": round(float(avg_units_per_day), 2),
-        "average_daily_revenue": round(float(daily_revenue), 2),
-        "product_bar_chart": product_bar_chart,
-        "revenue_line_chart": revenue_line_chart,
+        "total_sales": total_sales,
+        "average_sales": avg_sales,
+        "best_region": best_region,
+        "sales_trend_chart": sales_trend_chart,
+        "regional_sales_chart": regional_sales_chart,
     }
