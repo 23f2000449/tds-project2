@@ -1,13 +1,14 @@
 # main.py
+from __future__ import annotations
+
 import os
 import tempfile
-import json
 from typing import Any, Dict
 
 import matplotlib
-matplotlib.use("Agg")  # headless backend for image generation
+matplotlib.use("Agg")
 
-from fastapi import FastAPI, Request, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse
 
 # --- Import handlers ---
@@ -40,54 +41,76 @@ else:
 app = FastAPI(title="TDS Project – Data Analyst Agent API")
 
 
-@app.api_route("/", methods=["GET", "POST"])
-async def root(request: Request):
-    """
-    Handle both GET and POST for root.
-    GET -> health check
-    POST -> evaluator request (routes to correct handler based on question text).
-    """
-    if request.method == "GET":
-        return {
-            "service": "TDS Project – Data Analyst Agent API",
-            "status": "ok",
-            "usage": "POST JSON with 'vars.question' referring to weather/sales/network"
-        }
+@app.get("/")
+def root() -> Dict[str, Any]:
+    """Health/info endpoint."""
+    return {
+        "service": "TDS Project – Data Analyst Agent API",
+        "status": "ok",
+        "endpoint": "POST / (upload CSV to auto-detect type)",
+    }
 
+
+# ------------- Helpers -------------
+def _save_upload_to_temp(upload: UploadFile, suffix: str = ".csv") -> str:
+    """Save UploadFile to a temporary file and return its path."""
     try:
-        body = await request.json()
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid JSON payload.")
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp.write(upload.file.read())
+            return tmp.name
+    finally:
+        try:
+            upload.file.close()
+        except Exception:
+            pass
 
-    # The evaluator always includes the question inside body["vars"]["question"]
-    question = (
-        body.get("vars", {}).get("question", "")
-        if isinstance(body, dict) else ""
-    ).lower()
 
-    # Route based on keywords
+def _detect_handler(csv_path: str):
+    """Detect which handler to call based on CSV columns."""
+    import pandas as pd
     try:
-        if "temperature" in question or "precip" in question or "weather" in question:
-            # Evaluator provides a CSV path in body["vars"]["question"] context
-            path = "weather.csv"
-            result = analyze_weather(path) if analyze_weather else {}
-            return JSONResponse(content=result)
-
-        elif "sales" in question:
-            path = "sales.csv"
-            result = analyze_sales(path) if analyze_sales else {}
-            return JSONResponse(content=result)
-
-        elif "edges.csv" in question or "network" in question:
-            path = "edges.csv"
-            result = analyze_network(path) if analyze_network else {}
-            return JSONResponse(content=result)
-
-        else:
-            raise HTTPException(status_code=400, detail="Unrecognized task in question.")
-
+        df = pd.read_csv(csv_path, nrows=5)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Handler failed: {e}")
+        raise HTTPException(status_code=400, detail=f"Invalid CSV file: {e}")
+
+    cols = set(df.columns.str.lower())
+
+    if {"date", "temp_c", "precip_mm"}.issubset(cols):
+        if analyze_weather is None:
+            raise HTTPException(status_code=500, detail=f"Weather handler unavailable: {WEATHER_IMPORT_ERROR}")
+        return analyze_weather
+
+    if {"product", "sales"}.issubset(cols):
+        if analyze_sales is None:
+            raise HTTPException(status_code=500, detail=f"Sales handler unavailable: {SALES_IMPORT_ERROR}")
+        return analyze_sales
+
+    if {"source", "target"}.issubset(cols):
+        if analyze_network is None:
+            raise HTTPException(status_code=500, detail=f"Network handler unavailable: {NETWORK_IMPORT_ERROR}")
+        return analyze_network
+
+    raise HTTPException(status_code=400, detail="CSV format not recognized as weather, sales, or network.")
+
+
+# ------------- Unified evaluator endpoint -------------
+@app.post("/")
+async def analyze_csv(file: UploadFile = File(...)) -> JSONResponse:
+    if file.content_type and "csv" not in file.content_type:
+        raise HTTPException(status_code=400, detail="Please upload a CSV file.")
+
+    path = _save_upload_to_temp(file, suffix=".csv")
+    try:
+        handler = _detect_handler(path)
+        result = handler(path)
+        if not isinstance(result, dict):
+            raise HTTPException(status_code=500, detail="Handler must return a dict JSON object.")
+        return JSONResponse(content=result)
+    finally:
+        try:
+            os.remove(path)
+        except Exception:
+            pass
 
 
 # ------------- Local run -------------
