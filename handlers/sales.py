@@ -5,6 +5,28 @@ import base64
 import io
 import os
 
+import base64
+from io import BytesIO
+import matplotlib.pyplot as plt
+
+def _plot_to_base64(fig, max_kb: int = 100) -> str:
+    """
+    Convert a matplotlib figure to a base64-encoded PNG string under max_kb.
+    Returns the base64 string (without data: prefix).
+    """
+    try:
+        for dpi in (150, 120, 100, 90, 80, 70, 60):
+            buf = BytesIO()
+            fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight", pad_inches=0.1)
+            data = buf.getvalue()
+            if len(data) <= max_kb * 1024:  # check size
+                plt.close(fig)
+                return base64.b64encode(data).decode("utf-8")
+        # fallback: return even if it's bigger
+        return base64.b64encode(data).decode("utf-8")
+    finally:
+        plt.close(fig)
+
 def _fig_to_base64(fig):
     buf = io.BytesIO()
     fig.savefig(buf, format="png", bbox_inches="tight")
