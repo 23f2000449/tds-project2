@@ -1,4 +1,3 @@
-# handlers/network.py
 import base64, io, tempfile, os
 import networkx as nx
 import matplotlib
@@ -8,7 +7,6 @@ import pandas as pd
 from fastapi import APIRouter, UploadFile, File
 
 def plot_to_base64(fig, max_kb=100):
-    # keep images <100kB
     for dpi in (120, 100, 90, 80, 70, 60):
         buf = io.BytesIO()
         fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight", pad_inches=0.1)
@@ -30,11 +28,11 @@ def analyze_network_from_path(csv_path: str):
     highest_degree_node = max(degree_dict, key=degree_dict.get)
     average_degree = sum(degree_dict.values()) / len(degree_dict)
     density = nx.density(G)
-    # If "Alice" or "Eve" are missing, handle gracefully
+
     try:
         shortest_path_alice_eve = nx.shortest_path_length(G, source="Alice", target="Eve")
     except Exception:
-        shortest_path_alice_eve = None
+        shortest_path_alice_eve = -1  # safe fallback
 
     # Network plot
     fig1, ax1 = plt.subplots()
@@ -56,9 +54,9 @@ def analyze_network_from_path(csv_path: str):
         "highest_degree_node": str(highest_degree_node),
         "average_degree": float(round(average_degree, 2)),
         "density": float(round(density, 2)),
-        "shortest_path_alice_eve": None if shortest_path_alice_eve is None else int(shortest_path_alice_eve),
-        "network_graph": network_graph,
-        "degree_histogram": degree_histogram
+        "shortest_path_alice_eve": int(shortest_path_alice_eve),
+        "network_graph": "data:image/png;base64," + network_graph,
+        "degree_histogram": "data:image/png;base64," + degree_histogram
     }
 
 router = APIRouter()
@@ -73,6 +71,5 @@ async def analyze_network_endpoint(file: UploadFile = File(...)):
     finally:
         os.remove(tmp_path)
 
-# Legacy auto-registered GET/POST /network (for your dynamic loader)
 def handler(request):
     return analyze_network_from_path("edges.csv")
