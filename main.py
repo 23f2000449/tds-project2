@@ -3,37 +3,57 @@ from __future__ import annotations
 
 import os
 import tempfile
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import matplotlib
-matplotlib.use("Agg")  # headless backend
+matplotlib.use("Agg")  # headless backend for image generation
 
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse
 
-# Import handlers
-from handlers.weather import analyze_weather
-from handlers.sales import analyze_sales
-from handlers.network import analyze_network
+# --- Import handlers ---
+try:
+    from handlers.weather import analyze_weather
+except Exception as e:
+    analyze_weather = None
+    WEATHER_IMPORT_ERROR = e
+else:
+    WEATHER_IMPORT_ERROR = None
+
+try:
+    from handlers.sales import analyze_sales
+except Exception as e:
+    analyze_sales = None
+    SALES_IMPORT_ERROR = e
+else:
+    SALES_IMPORT_ERROR = None
+
+try:
+    from handlers.network import analyze_network
+except Exception as e:
+    analyze_network = None
+    NETWORK_IMPORT_ERROR = e
+else:
+    NETWORK_IMPORT_ERROR = None
 
 
 # ------------------------ FastAPI app ------------------------
-app = FastAPI(title="TDS Project – Unified API")
+app = FastAPI(title="TDS Project – Data Analyst Agent API")
 
 
 @app.get("/")
 def root() -> Dict[str, Any]:
-    """Health/info endpoint (GET only)."""
+    """Health/info endpoint for GET /"""
     return {
-        "service": "TDS Project – Unified API",
+        "service": "TDS Project – Data Analyst Agent API",
         "status": "ok",
-        "usage": "POST a CSV file to `/` and it will auto-analyze (weather, sales, or network).",
+        "hint": "POST a CSV file to / with filename containing 'weather', 'sales', or 'network'."
     }
 
 
 # ------------- Helpers -------------
 def _save_upload_to_temp(upload: UploadFile, suffix: str = ".csv") -> str:
-    """Save an UploadFile to a temporary file and return path."""
+    """Save UploadFile to a temporary file and return its path."""
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
             tmp.write(upload.file.read())
@@ -45,54 +65,13 @@ def _save_upload_to_temp(upload: UploadFile, suffix: str = ".csv") -> str:
             pass
 
 
-def _detect_dataset_type(path: str) -> str:
-    """Peek CSV header to decide which handler to use."""
-    with open(path, "r", encoding="utf-8") as f:
-        header = f.readline().strip().lower()
-
-    if "temperature" in header and "precipitation" in header:
-        return "weather"
-    elif "sales" in header or "revenue" in header or "profit" in header:
-        return "sales"
-    elif "source" in header and "target" in header:
-        return "network"
-    else:
-        raise HTTPException(status_code=400, detail=f"Unrecognized CSV schema: {header}")
-
-
-# ------------- Unified evaluator endpoint -------------
-@app.post("/")
-async def analyze_unified(file: UploadFile = File(...)) -> JSONResponse:
-    if file.content_type and "csv" not in file.content_type:
-        raise HTTPException(status_code=400, detail="Please upload a CSV file.")
-
-    path = _save_upload_to_temp(file, suffix=".csv")
-    try:
-        dataset_type = _detect_dataset_type(path)
-
-        if dataset_type == "weather":
-            result = analyze_weather(path)
-        elif dataset_type == "sales":
-            result = analyze_sales(path)
-        elif dataset_type == "network":
-            result = analyze_network(path)
-        else:
-            raise HTTPException(status_code=400, detail="Could not determine dataset type.")
-
-        if not isinstance(result, dict):
-            raise HTTPException(status_code=500, detail="Handler must return a JSON dict.")
-
-        return JSONResponse(content=result)
-
-    finally:
-        try:
-            os.remove(path)
-        except Exception:
-            pass
-
-
-# ------------- Local run -------------
-if __name__ == "__main__":
-    import uvicorn
-    port = int(os.environ.get("PORT", "8000"))
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
+def _call_handler_or_500(handler_name: str, func: Optional[callable], csv_path: str) -> Dict[str, Any]:
+    """Call handler safely; raise HTTP 500 if unavailable or failing."""
+    if func is None:
+        extra = None
+        if handler_name == "analyze_weather":
+            extra = WEATHER_IMPORT_ERROR
+        elif handler_name == "analyze_sales":
+            extra = SALES_IMPORT_ERROR
+        elif handler_name == "analyze_network":
+            extra = NETWORK_IMPORT
