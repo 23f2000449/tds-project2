@@ -10,7 +10,7 @@ import matplotlib
 matplotlib.use("Agg")  # headless backend for image generation
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from fastapi.exception_handlers import request_validation_exception_handler
 
@@ -111,7 +111,19 @@ def _call_handler_or_500(handler_name: str, func: Optional[callable], csv_path: 
         raise HTTPException(status_code=500, detail=f"Handler {handler_name} failed: {exc}")
 
 @app.post("/")
-async def analyze_csv(file: UploadFile = File(...)) -> Dict[str, Any]:
+async def analyze_csv(file: Optional[UploadFile] = File(None), request: Request = None) -> Dict[str, Any]:
+    # Log all form fields to diagnose missing 'file' field issues
+    if request is not None:
+        form = await request.form()
+        logging.debug(f"Received form fields: {list(form.keys())}")
+
+    if file is None:
+        logging.error("Missing file field in request")
+        return JSONResponse(
+            status_code=400,
+            content={"detail": "Missing file field in request"},
+        )
+
     filename = file.filename.lower()
     content_type = file.content_type
     logging.info(f"Received file: filename={filename}, content_type={content_type}")
