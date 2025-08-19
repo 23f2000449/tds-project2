@@ -4,7 +4,6 @@ matplotlib.use("Agg")  # headless backend
 import matplotlib.pyplot as plt
 import base64
 from io import BytesIO
-import numpy as np
 
 def _plot_to_base64(fig, max_kb: int = 100) -> str:
     """Convert matplotlib figure to base64 PNG string under max_kb."""
@@ -14,7 +13,6 @@ def _plot_to_base64(fig, max_kb: int = 100) -> str:
             fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight", pad_inches=0.1)
             data = buf.getvalue()
             if len(data) <= max_kb * 1024:
-                plt.close(fig)
                 return base64.b64encode(data).decode("utf-8")
         return base64.b64encode(data).decode("utf-8")
     finally:
@@ -22,29 +20,37 @@ def _plot_to_base64(fig, max_kb: int = 100) -> str:
 
 def analyze_weather(csv_path: str) -> dict:
     df = pd.read_csv(csv_path)
-
+    
+    # Defensive checks
+    required_columns = {"temp_c", "precip_mm", "date"}
+    if not required_columns.issubset(df.columns):
+        raise ValueError(f"CSV missing one of required columns: {required_columns}")
+    
     avg_temp = df["temp_c"].mean()
     min_temp = df["temp_c"].min()
-    max_precip_date = df.loc[df["precip_mm"].idxmax(), "date"]
+    
+    max_precip_idx = df["precip_mm"].idxmax()
+    max_precip_date = df.loc[max_precip_idx, "date"] if pd.notna(max_precip_idx) else ""
+    
     avg_precip = df["precip_mm"].mean()
     correlation = df["temp_c"].corr(df["precip_mm"])
-
-    # --- Temperature line chart ---
+    
+    # Temperature line chart
     fig1, ax1 = plt.subplots()
     ax1.plot(df["date"], df["temp_c"], color="red")
     ax1.set_xlabel("Date")
     ax1.set_ylabel("Temperature (°C)")
     ax1.set_title("Temperature Over Time")
     temp_line_chart = _plot_to_base64(fig1)
-
-    # --- Precipitation histogram ---
+    
+    # Precipitation histogram
     fig2, ax2 = plt.subplots()
     ax2.hist(df["precip_mm"], bins=10, color="orange", edgecolor="black")
     ax2.set_xlabel("Precipitation (mm)")
     ax2.set_ylabel("Frequency")
     ax2.set_title("Precipitation Histogram")
     precip_histogram = _plot_to_base64(fig2)
-
+    
     return {
         "average_temp_c": round(float(avg_temp), 2),
         "max_precip_date": str(max_precip_date),
