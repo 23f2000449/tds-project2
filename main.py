@@ -170,7 +170,7 @@ async def analyze_csv(request: Request):
     elif "weather" in filename:
         handler = analyze_weather
         handler_name = "analyze_weather"
-        required_cols = {"precip_mm", "temp_c", "date"}
+        required_cols = {"precip_mm", "date"}
     else:
         logging.error(f"Filename '{filename}' does not contain required keywords after selection")
         return JSONResponse(status_code=400, content={"detail": "Filename must contain 'network', 'edges', 'sales', or 'weather'."})
