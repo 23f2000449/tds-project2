@@ -33,13 +33,18 @@ except Exception as e:
 else:
     NETWORK_IMPORT_ERROR = None
 
-# Setup FastAPI app and logging
+# Setup FastAPI app and detailed logging
 app = FastAPI(title="TDS Project – Data Analyst Agent API")
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(
+    level=logging.DEBUG,  # Set to DEBUG for detailed logs
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.StreamHandler()]
+)
 
 @app.get("/")
 def root() -> Dict[str, Any]:
     """Health/info endpoint for GET /"""
+    logging.debug("Health check endpoint accessed")
     return {
         "service": "TDS Project – Data Analyst Agent API",
         "status": "ok",
@@ -50,13 +55,15 @@ def _save_upload_to_temp(upload: UploadFile, suffix: str = ".csv") -> str:
     """Save UploadFile to a temporary file and return its path."""
     try:
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-            tmp.write(upload.file.read())
+            data = upload.file.read()
+            tmp.write(data)
+            logging.debug(f"Saved upload to temp file {tmp.name} ({len(data)} bytes)")
             return tmp.name
     finally:
         try:
             upload.file.close()
-        except Exception:
-            pass
+        except Exception as e:
+            logging.warning(f"Failed to close upload file: {e}")
 
 def _call_handler_or_500(handler_name: str, func: Optional[callable], csv_path: str) -> Dict[str, Any]:
     """Call handler safely; raise HTTP 500 if handler unavailable or raises exception."""
@@ -68,16 +75,27 @@ def _call_handler_or_500(handler_name: str, func: Optional[callable], csv_path: 
             extra = SALES_IMPORT_ERROR
         elif handler_name == "analyze_network":
             extra = NETWORK_IMPORT_ERROR
+        logging.error(f"Handler unavailable: {handler_name}, error: {extra}")
         raise HTTPException(status_code=500, detail=f"Handler unavailable: {handler_name}, error: {extra}")
     try:
-        return func(csv_path)
+        result = func(csv_path)
+        logging.debug(f"Handler {handler_name} returned result with keys: {list(result.keys())}")
+        # Additional debug: log length and type of each value
+        for k, v in result.items():
+            if isinstance(v, str) and len(v) > 100:
+                logging.debug(f"Result key '{k}' value is a str of length {len(v)}")
+            else:
+                logging.debug(f"Result key '{k}' value type: {type(v)}, value: {v}")
+        return result
     except Exception as exc:
+        logging.exception(f"Handler {handler_name} failed with exception")
         raise HTTPException(status_code=500, detail=f"Handler {handler_name} failed with error: {exc}")
 
 @app.post("/")
 async def analyze_csv(file: UploadFile = File(...)) -> Dict[str, Any]:
     filename = file.filename.lower()
-    logging.info(f"Received file: filename={filename}, content_type={file.content_type}")
+    content_type = file.content_type
+    logging.info(f"Received file: filename={filename}, content_type={content_type}")
 
     if "weather" in filename:
         handler = analyze_weather
@@ -89,14 +107,19 @@ async def analyze_csv(file: UploadFile = File(...)) -> Dict[str, Any]:
         handler = analyze_network
         handler_name = "analyze_network"
     else:
+        logging.error("File name does not contain required keywords")
         raise HTTPException(status_code=400, detail="Filename must contain 'weather', 'sales', or 'network'")
 
     csv_path = _save_upload_to_temp(file)
+
     try:
         result = _call_handler_or_500(handler_name, handler, csv_path)
-        logging.info(f"Handler {handler_name} produced keys: {list(result.keys())}")
     finally:
         if os.path.exists(csv_path):
-            os.remove(csv_path)
+            try:
+                os.remove(csv_path)
+                logging.debug(f"Temporary file {csv_path} deleted")
+            except Exception as e:
+                logging.warning(f"Failed to delete temp file {csv_path}: {e}")
 
     return JSONResponse(content=result)
