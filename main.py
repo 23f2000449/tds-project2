@@ -5,6 +5,7 @@ from typing import Any, Dict, Optional
 import logging
 import traceback
 import sys
+import csv
 
 import matplotlib
 matplotlib.use("Agg")  # headless backend for image generation
@@ -107,60 +108,73 @@ def _call_handler_or_500(handler_name: str, func: Optional[callable], csv_path: 
         logging.error(f"Exception in handler {handler_name}: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Handler {handler_name} failed: {exc}")
 
+def _validate_csv_headers(csv_path: str, required_columns: set[str]) -> Optional[str]:
+    # Returns None if valid, else error string
+    try:
+        with open(csv_path, newline='', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            headers = next(reader)
+            headers_set = set(h.lower() for h in headers)
+            if not required_columns.issubset(headers_set):
+                return f"CSV missing required columns: {required_columns - headers_set}"
+    except Exception as e:
+        return f"Failed to read CSV headers: {e}"
+    return None
+
 @app.post("/")
 async def analyze_csv(request: Request):
     form = await request.form()
     logging.info(f"Received form fields: {list(form.keys())}")
 
-    # Find the proper CSV upload file based on filename containing target keywords
     upload_file = None
     upload_key = None
-
+    # 1) Find CSV file with expected keywords and '.csv' extension
     for key, value in form.items():
-        if hasattr(value, "filename") and value.filename:
+        if hasattr(value, "filename") and value.filename and value.filename.lower().endswith(".csv"):
             fname = value.filename.lower()
             if any(keyword in fname for keyword in ["network", "sales", "weather"]):
                 upload_file = value
                 upload_key = key
                 break
 
-    # If no file matches expected keywords, try to fallback on any uploaded file
+    # 2) If no matching CSV, reject with clear message (do not fallback on non-CSV)
     if not upload_file:
-        logging.warning("No matching file found with 'network', 'sales', or 'weather' in filename, searching for any uploaded file")
-        for key, value in form.items():
-            if hasattr(value, "filename") and value.filename:
-                upload_file = value
-                upload_key = key
-                break
-
-    if not upload_file:
-        logging.error("No file upload found in request")
+        logging.error("No CSV file found with 'network', 'sales', or 'weather' in filename")
         return JSONResponse(
             status_code=400,
-            content={"detail": "No file upload found in request"},
+            content={"detail": "No CSV file found with 'network', 'sales', or 'weather' in filename."},
         )
 
     logging.info(f"Using uploaded file from field '{upload_key}': {upload_file.filename}")
-
     filename = upload_file.filename.lower()
 
     if "network" in filename:
         handler = analyze_network
         handler_name = "analyze_network"
+        required_cols = {"source", "target"}  # Adjust to your exact needed columns if any.
     elif "sales" in filename:
         handler = analyze_sales
         handler_name = "analyze_sales"
+        required_cols = {"sales", "region", "date"}
     elif "weather" in filename:
         handler = analyze_weather
         handler_name = "analyze_weather"
+        required_cols = {"precip_mm", "temp_c", "date"}
     else:
-        logging.error(f"Filename '{filename}' does not contain required keywords")
-        return JSONResponse(
-            status_code=400,
-            content={"detail": "Filename must contain 'network', 'sales', or 'weather'."},
-        )
+        logging.error(f"Filename '{filename}' does not contain required keywords after selection")
+        return JSONResponse(status_code=400, content={"detail": "Filename must contain 'network', 'sales', or 'weather'."})
 
     csv_path = _save_upload_to_temp(upload_file)
+
+    # Validate CSV headers before processing
+    val_error = _validate_csv_headers(csv_path, required_cols)
+    if val_error:
+        logging.error(val_error)
+        try:
+            os.remove(csv_path)
+        except Exception:
+            pass
+        return JSONResponse(status_code=400, content={"detail": val_error})
 
     try:
         result = _call_handler_or_500(handler_name, handler, csv_path)
