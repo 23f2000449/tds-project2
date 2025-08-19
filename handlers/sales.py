@@ -13,7 +13,6 @@ def _plot_to_base64(fig, max_kb: int = 100) -> str:
             fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight", pad_inches=0.1)
             data = buf.getvalue()
             if len(data) <= max_kb * 1024:
-                plt.close(fig)
                 return base64.b64encode(data).decode("utf-8")
         return base64.b64encode(data).decode("utf-8")
     finally:
@@ -22,19 +21,18 @@ def _plot_to_base64(fig, max_kb: int = 100) -> str:
 def analyze_sales(csv_path: str) -> dict:
     df = pd.read_csv(csv_path)
 
-    # Required calculations
+    # Defensive checks: ensure columns exist
+    if not {'sales', 'region', 'date'}.issubset(df.columns):
+        raise ValueError("CSV missing required columns")
+    
     total_sales = df["sales"].sum()
     median_sales = df["sales"].median()
-
-    # Assume df has a "region" column for top_region calculation
     top_region = df.groupby("region")["sales"].sum().idxmax()
 
-    # Calculate correlation between day of month and sales
-    # Extract day from "date" column, assuming format compatible
+    # Extract day for correlation
     df["day"] = pd.to_datetime(df["date"]).dt.day
     day_sales_correlation = df["day"].corr(df["sales"])
 
-    # Calculate total sales tax (10% of total sales)
     total_sales_tax = total_sales * 0.10
 
     # Bar chart: total sales by region (blue bars)
