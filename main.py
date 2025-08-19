@@ -164,6 +164,10 @@ async def analyze_csv(request: Request):
         return JSONResponse(status_code=400, content={"detail": "Filename must contain 'network', 'edges', 'sales', or 'weather'."})
 
     csv_path = _save_upload_to_temp(upload_file)
+    with open(csv_path, 'r', encoding='utf-8') as f:
+        header_line = f.readline().strip()
+    logging.debug(f"CSV header line in '{upload_file.filename}': {header_line}")
+
 
     val_error = _validate_csv_headers(csv_path, required_cols)
     if val_error:
