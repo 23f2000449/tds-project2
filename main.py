@@ -74,4 +74,34 @@ def _call_handler_or_500(handler_name: str, func: Optional[callable], csv_path: 
         elif handler_name == "analyze_sales":
             extra = SALES_IMPORT_ERROR
         elif handler_name == "analyze_network":
-            extra = NETWORK_IMPORT
+            extra = NETWORK_IMPORT_ERROR
+        raise HTTPException(status_code=500, detail=f"Handler unavailable: {handler_name}, error: {extra}")
+    try:
+        return func(csv_path)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Handler {handler_name} failed with error: {exc}")
+
+
+# ------------- POST Endpoint to accept CSV files -------------
+@app.post("/")
+async def analyze_csv(file: UploadFile = File(...)) -> Dict[str, Any]:
+    filename = file.filename.lower()
+    if "weather" in filename:
+        handler = analyze_weather
+        handler_name = "analyze_weather"
+    elif "sales" in filename:
+        handler = analyze_sales
+        handler_name = "analyze_sales"
+    elif "network" in filename:
+        handler = analyze_network
+        handler_name = "analyze_network"
+    else:
+        raise HTTPException(status_code=400, detail="Filename must contain 'weather', 'sales', or 'network'")
+    
+    csv_path = _save_upload_to_temp(file)
+    try:
+        result = _call_handler_or_500(handler_name, handler, csv_path)
+    finally:
+        if os.path.exists(csv_path):
+            os.remove(csv_path)
+    return JSONResponse(content=result)
