@@ -109,14 +109,25 @@ def _call_handler_or_500(handler_name: str, func: Optional[callable], csv_path: 
         logging.error(f"Exception in handler {handler_name}: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Handler {handler_name} failed: {exc}")
 
-def _validate_csv_headers(csv_path: str, required_columns: set[str]) -> Optional[str]:
+def _validate_weather_csv_headers(csv_path: str, required_columns: set[str]) -> Optional[str]:
     try:
         with open(csv_path, newline='', encoding='utf-8') as f:
             reader = csv.reader(f)
             headers = next(reader)
             headers_set = set(h.lower() for h in headers)
+
+            # Accept 'temp_c' or 'temperature_c'
+            if not ({"temp_c", "temperature_c"} & headers_set):
+                return "CSV missing required column: 'temp_c' or 'temperature_c'"
+            
             if not required_columns.issubset(headers_set):
-                return f"CSV missing required columns: {required_columns - headers_set}"
+                # Remove temp_c or temperature_c from the check as handled above
+                missing = required_columns - headers_set
+                missing.discard("temp_c")
+                missing.discard("temperature_c")
+                if missing:
+                    return f"CSV missing required columns: {missing}"
+
     except Exception as e:
         return f"Failed to read CSV headers: {e}"
     return None
