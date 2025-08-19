@@ -100,5 +100,8 @@ async def analyze_csv(file: UploadFile = File(...)) -> Dict[str, Any]:
     finally:
         if os.path.exists(csv_path):
             os.remove(csv_path)
+    import json
+    print("Response JSON preview:", json.dumps(result)[:500])  # first 500 chars
+
     return JSONResponse(content=result)
 
