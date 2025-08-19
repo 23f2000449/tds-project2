@@ -1,4 +1,3 @@
-# main.py
 from __future__ import annotations
 import os
 import tempfile
@@ -7,10 +6,8 @@ import logging
 import traceback
 import sys
 import csv
-
 import matplotlib
 matplotlib.use("Agg")  # headless backend for image generation
-
 from fastapi import FastAPI, UploadFile, File, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
@@ -95,7 +92,6 @@ def _call_handler_or_500(handler_name: str, func: Optional[callable], csv_path: 
             extra = NETWORK_IMPORT_ERROR
         logging.error(f"Handler {handler_name} unavailable: {extra}")
         raise HTTPException(status_code=500, detail=f"Handler {handler_name} unavailable: {extra}")
-
     try:
         result = func(csv_path)
         logging.debug(f"Handler {handler_name} returned keys: {list(result.keys())}")
@@ -115,13 +111,10 @@ def _validate_weather_csv_headers(csv_path: str, required_columns: set[str]) -> 
             reader = csv.reader(f)
             headers = next(reader)
             headers_set = set(h.lower() for h in headers)
-
-            # Accept 'temp_c' or 'temperature_c'
             if not ({"temp_c", "temperature_c"} & headers_set):
                 return "CSV missing required column: 'temp_c' or 'temperature_c'"
-            
+
             if not required_columns.issubset(headers_set):
-                # Remove temp_c or temperature_c from the check as handled above
                 missing = required_columns - headers_set
                 missing.discard("temp_c")
                 missing.discard("temperature_c")
@@ -132,14 +125,24 @@ def _validate_weather_csv_headers(csv_path: str, required_columns: set[str]) -> 
         return f"Failed to read CSV headers: {e}"
     return None
 
+def _validate_csv_headers(csv_path: str, required_columns: set[str]) -> Optional[str]:
+    try:
+        with open(csv_path, newline='', encoding='utf-8') as f:
+            reader = csv.reader(f)
+            headers = next(reader)
+            headers_set = set(h.lower() for h in headers)
+            if not required_columns.issubset(headers_set):
+                return f"CSV missing required columns: {required_columns - headers_set}"
+    except Exception as e:
+        return f"Failed to read CSV headers: {e}"
+    return None
+
 @app.post("/")
 async def analyze_csv(request: Request):
     form = await request.form()
     logging.info(f"Received form fields: {list(form.keys())}")
-
     upload_file = None
     upload_key = None
-
     # Find CSV file with expected keywords including "edges" mapped to network
     for key, value in form.items():
         if hasattr(value, "filename") and value.filename and value.filename.lower().endswith(".csv"):
@@ -148,17 +151,14 @@ async def analyze_csv(request: Request):
                 upload_file = value
                 upload_key = key
                 break
-
     if not upload_file:
         logging.error("No CSV file found with 'network', 'edges', 'sales', or 'weather' in filename")
         return JSONResponse(
             status_code=400,
             content={"detail": "No CSV file found with 'network', 'edges', 'sales', or 'weather' in filename."},
         )
-
     logging.info(f"Using uploaded file from field '{upload_key}': {upload_file.filename}")
     filename = upload_file.filename.lower()
-
     if any(keyword in filename for keyword in ["network", "edges"]):
         handler = analyze_network
         handler_name = "analyze_network"
@@ -170,22 +170,18 @@ async def analyze_csv(request: Request):
     elif "weather" in filename:
         handler = analyze_weather
         handler_name = "analyze_weather"
-        required_cols = {"precip_mm", "date"}
+        required_cols = {"precip_mm", "date"}  # temp_c handled in weather validator separately
     else:
         logging.error(f"Filename '{filename}' does not contain required keywords after selection")
         return JSONResponse(status_code=400, content={"detail": "Filename must contain 'network', 'edges', 'sales', or 'weather'."})
-
     csv_path = _save_upload_to_temp(upload_file)
     with open(csv_path, 'r', encoding='utf-8') as f:
         header_line = f.readline().strip()
     logging.debug(f"CSV header line in '{upload_file.filename}': {header_line}")
-
-
     if handler_name == "analyze_weather":
         val_error = _validate_weather_csv_headers(csv_path, required_cols)
     else:
         val_error = _validate_csv_headers(csv_path, required_cols)
-
     if val_error:
         logging.error(val_error)
         try:
@@ -193,7 +189,6 @@ async def analyze_csv(request: Request):
         except Exception:
             pass
         return JSONResponse(status_code=400, content={"detail": val_error})
-
     try:
         result = _call_handler_or_500(handler_name, handler, csv_path)
     finally:
@@ -202,5 +197,4 @@ async def analyze_csv(request: Request):
             logging.debug(f"Deleted temporary file {csv_path}")
         except Exception as e:
             logging.warning(f"Could not delete temp file {csv_path}: {e}")
-
     return JSONResponse(content=result)
