@@ -1,4 +1,3 @@
-# main.py
 from __future__ import annotations
 import os
 import tempfile
@@ -8,7 +7,8 @@ import matplotlib
 matplotlib.use("Agg")  # headless backend for image generation
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse
-# --- Import handlers ---
+
+# --- Import handlers with error handling ---
 try:
     from handlers.weather import analyze_weather
 except Exception as e:
@@ -16,6 +16,7 @@ except Exception as e:
     WEATHER_IMPORT_ERROR = e
 else:
     WEATHER_IMPORT_ERROR = None
+
 try:
     from handlers.sales import analyze_sales
 except Exception as e:
@@ -23,6 +24,7 @@ except Exception as e:
     SALES_IMPORT_ERROR = e
 else:
     SALES_IMPORT_ERROR = None
+
 try:
     from handlers.network import analyze_network
 except Exception as e:
@@ -30,9 +32,9 @@ except Exception as e:
     NETWORK_IMPORT_ERROR = e
 else:
     NETWORK_IMPORT_ERROR = None
-# ------------------------ FastAPI app ------------------------
-app = FastAPI(title="TDS Project – Data Analyst Agent API")
 
+# Setup FastAPI app and logging
+app = FastAPI(title="TDS Project – Data Analyst Agent API")
 logging.basicConfig(level=logging.INFO)
 
 @app.get("/")
@@ -44,7 +46,6 @@ def root() -> Dict[str, Any]:
         "hint": "POST a CSV file to / with filename containing 'weather', 'sales', or 'network'."
     }
 
-# ------------- Helpers -------------
 def _save_upload_to_temp(upload: UploadFile, suffix: str = ".csv") -> str:
     """Save UploadFile to a temporary file and return its path."""
     try:
@@ -58,7 +59,7 @@ def _save_upload_to_temp(upload: UploadFile, suffix: str = ".csv") -> str:
             pass
 
 def _call_handler_or_500(handler_name: str, func: Optional[callable], csv_path: str) -> Dict[str, Any]:
-    """Call handler safely; raise HTTP 500 if unavailable or failing."""
+    """Call handler safely; raise HTTP 500 if handler unavailable or raises exception."""
     if func is None:
         extra = None
         if handler_name == "analyze_weather":
@@ -73,11 +74,11 @@ def _call_handler_or_500(handler_name: str, func: Optional[callable], csv_path: 
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Handler {handler_name} failed with error: {exc}")
 
-# ------------- POST Endpoint to accept CSV files -------------
 @app.post("/")
 async def analyze_csv(file: UploadFile = File(...)) -> Dict[str, Any]:
-    print(f"Received file: filename={file.filename}, content_type={file.content_type}")
     filename = file.filename.lower()
+    logging.info(f"Received file: filename={filename}, content_type={file.content_type}")
+
     if "weather" in filename:
         handler = analyze_weather
         handler_name = "analyze_weather"
@@ -89,19 +90,13 @@ async def analyze_csv(file: UploadFile = File(...)) -> Dict[str, Any]:
         handler_name = "analyze_network"
     else:
         raise HTTPException(status_code=400, detail="Filename must contain 'weather', 'sales', or 'network'")
-    
+
     csv_path = _save_upload_to_temp(file)
     try:
         result = _call_handler_or_500(handler_name, handler, csv_path)
-        logging.info(f"Handler result keys: {list(result.keys())}")
-        for key, value in result.items():
-            if isinstance(value, str) and len(value) < 10:
-                logging.warning(f"Value for key '{key}' may be invalid or too short.")
+        logging.info(f"Handler {handler_name} produced keys: {list(result.keys())}")
     finally:
         if os.path.exists(csv_path):
             os.remove(csv_path)
-    import json
-    print("Response JSON preview:", json.dumps(result)[:500])  # first 500 chars
 
     return JSONResponse(content=result)
-
