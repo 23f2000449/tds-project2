@@ -15,10 +15,10 @@ def _plot_to_base64(fig, max_kb: int = 100) -> str:
             data = buf.getvalue()
             if len(data) <= max_kb * 1024:
                 return base64.b64encode(data).decode("utf-8")
-        # If all dpi attempts are larger than max_kb, return the smallest possible
+        # If no dpi produces small enough image, return the last one anyway
         return base64.b64encode(data).decode("utf-8")
     finally:
-        plt.close(fig)  # Ensure the figure is closed to free memory
+        plt.close(fig)
 
 def analyze_network(csv_path: str) -> dict:
     # Read CSV with edges
@@ -31,16 +31,21 @@ def analyze_network(csv_path: str) -> dict:
     
     edge_count = G.number_of_edges()
     degree_dict = dict(G.degree())
-    highest_degree_node = max(degree_dict, key=degree_dict.get)
-    average_degree = sum(degree_dict.values()) / len(degree_dict)
-    density = nx.density(G)
+    
+    # Defensive: check for empty graph
+    if len(degree_dict) == 0:
+        highest_degree_node = None
+        average_degree = 0.0
+    else:
+        highest_degree_node = max(degree_dict, key=degree_dict.get)
+        average_degree = sum(degree_dict.values()) / len(degree_dict)
+    
+    density = nx.density(G) if edge_count > 0 else 0.0
     
     # Try getting shortest path between Alice and Eve, else None
     try:
         shortest_path_alice_eve = nx.shortest_path_length(G, source="Alice", target="Eve")
-    except nx.NetworkXNoPath:
-        shortest_path_alice_eve = None
-    except nx.NodeNotFound:
+    except (nx.NetworkXNoPath, nx.NodeNotFound):
         shortest_path_alice_eve = None
     
     # Draw network graph
@@ -61,10 +66,10 @@ def analyze_network(csv_path: str) -> dict:
     # Assemble output JSON dict
     return {
         "edge_count": int(edge_count),
-        "highest_degree_node": str(highest_degree_node),
+        "highest_degree_node": str(highest_degree_node) if highest_degree_node is not None else "",
         "average_degree": round(float(average_degree), 2),
         "density": round(float(density), 2),
-        "shortest_path_alice_eve": None if shortest_path_alice_eve is None else int(shortest_path_alice_eve),
+        "shortest_path_alice_eve": int(shortest_path_alice_eve) if shortest_path_alice_eve is not None else None,
         "network_graph": network_graph,
         "degree_histogram": degree_histogram,
     }
