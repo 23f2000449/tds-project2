@@ -20,29 +20,38 @@ def _plot_to_base64(fig, max_kb: int = 100) -> str:
 
 def analyze_weather(csv_path: str) -> dict:
     df = pd.read_csv(csv_path)
-    
-    # Defensive checks
-    required_columns = {"temp_c", "precip_mm", "date"}
-    if not required_columns.issubset(df.columns):
-        raise ValueError(f"CSV missing one of required columns: {required_columns}")
-    
-    avg_temp = df["temp_c"].mean()
-    min_temp = df["temp_c"].min()
-    
+
+    # Check for temperature column: accept either 'temp_c' or 'temperature_c'
+    if "temp_c" in df.columns:
+        temp_col = "temp_c"
+    elif "temperature_c" in df.columns:
+        temp_col = "temperature_c"
+    else:
+        raise ValueError("CSV missing temperature column 'temp_c' or 'temperature_c'")
+
+    # Required columns check (always must have 'precip_mm' and 'date')
+    required_columns = {"precip_mm", "date"}
+    missing = required_columns - set(df.columns)
+    if missing:
+        raise ValueError(f"CSV missing required columns: {missing}")
+
+    avg_temp = df[temp_col].mean()
+    min_temp = df[temp_col].min()
+
     max_precip_idx = df["precip_mm"].idxmax()
     max_precip_date = df.loc[max_precip_idx, "date"] if pd.notna(max_precip_idx) else ""
-    
+
     avg_precip = df["precip_mm"].mean()
-    correlation = df["temp_c"].corr(df["precip_mm"])
-    
+    correlation = df[temp_col].corr(df["precip_mm"])
+
     # Temperature line chart
     fig1, ax1 = plt.subplots()
-    ax1.plot(df["date"], df["temp_c"], color="red")
+    ax1.plot(df["date"], df[temp_col], color="red")
     ax1.set_xlabel("Date")
     ax1.set_ylabel("Temperature (°C)")
     ax1.set_title("Temperature Over Time")
     temp_line_chart = _plot_to_base64(fig1)
-    
+
     # Precipitation histogram
     fig2, ax2 = plt.subplots()
     ax2.hist(df["precip_mm"], bins=10, color="orange", edgecolor="black")
@@ -50,7 +59,7 @@ def analyze_weather(csv_path: str) -> dict:
     ax2.set_ylabel("Frequency")
     ax2.set_title("Precipitation Histogram")
     precip_histogram = _plot_to_base64(fig2)
-    
+
     return {
         "average_temp_c": round(float(avg_temp), 2),
         "max_precip_date": str(max_precip_date),
