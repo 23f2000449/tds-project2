@@ -181,7 +181,11 @@ async def analyze_csv(request: Request):
     logging.debug(f"CSV header line in '{upload_file.filename}': {header_line}")
 
 
-    val_error = _validate_csv_headers(csv_path, required_cols)
+    if handler_name == "analyze_weather":
+        val_error = _validate_weather_csv_headers(csv_path, required_cols)
+    else:
+        val_error = _validate_csv_headers(csv_path, required_cols)
+
     if val_error:
         logging.error(val_error)
         try:
