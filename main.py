@@ -76,6 +76,7 @@ def _call_handler_or_500(handler_name: str, func: Optional[callable], csv_path: 
 # ------------- POST Endpoint to accept CSV files -------------
 @app.post("/")
 async def analyze_csv(file: UploadFile = File(...)) -> Dict[str, Any]:
+    print(f"Received file: filename={file.filename}, content_type={file.content_type}")
     filename = file.filename.lower()
     if "weather" in filename:
         handler = analyze_weather
