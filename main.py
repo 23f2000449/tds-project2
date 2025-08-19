@@ -109,7 +109,6 @@ def _call_handler_or_500(handler_name: str, func: Optional[callable], csv_path: 
         raise HTTPException(status_code=500, detail=f"Handler {handler_name} failed: {exc}")
 
 def _validate_csv_headers(csv_path: str, required_columns: set[str]) -> Optional[str]:
-    # Returns None if valid, else error string
     try:
         with open(csv_path, newline='', encoding='utf-8') as f:
             reader = csv.reader(f)
@@ -128,30 +127,30 @@ async def analyze_csv(request: Request):
 
     upload_file = None
     upload_key = None
-    # 1) Find CSV file with expected keywords and '.csv' extension
+
+    # Find CSV file with expected keywords including "edges" mapped to network
     for key, value in form.items():
         if hasattr(value, "filename") and value.filename and value.filename.lower().endswith(".csv"):
             fname = value.filename.lower()
-            if any(keyword in fname for keyword in ["network", "sales", "weather"]):
+            if any(keyword in fname for keyword in ["network", "edges", "sales", "weather"]):
                 upload_file = value
                 upload_key = key
                 break
 
-    # 2) If no matching CSV, reject with clear message (do not fallback on non-CSV)
     if not upload_file:
-        logging.error("No CSV file found with 'network', 'sales', or 'weather' in filename")
+        logging.error("No CSV file found with 'network', 'edges', 'sales', or 'weather' in filename")
         return JSONResponse(
             status_code=400,
-            content={"detail": "No CSV file found with 'network', 'sales', or 'weather' in filename."},
+            content={"detail": "No CSV file found with 'network', 'edges', 'sales', or 'weather' in filename."},
         )
 
     logging.info(f"Using uploaded file from field '{upload_key}': {upload_file.filename}")
     filename = upload_file.filename.lower()
 
-    if "network" in filename:
+    if any(keyword in filename for keyword in ["network", "edges"]):
         handler = analyze_network
         handler_name = "analyze_network"
-        required_cols = {"source", "target"}  # Adjust to your exact needed columns if any.
+        required_cols = {"source", "target"}  # adjust if your network handler requires specific columns
     elif "sales" in filename:
         handler = analyze_sales
         handler_name = "analyze_sales"
@@ -162,11 +161,10 @@ async def analyze_csv(request: Request):
         required_cols = {"precip_mm", "temp_c", "date"}
     else:
         logging.error(f"Filename '{filename}' does not contain required keywords after selection")
-        return JSONResponse(status_code=400, content={"detail": "Filename must contain 'network', 'sales', or 'weather'."})
+        return JSONResponse(status_code=400, content={"detail": "Filename must contain 'network', 'edges', 'sales', or 'weather'."})
 
     csv_path = _save_upload_to_temp(upload_file)
 
-    # Validate CSV headers before processing
     val_error = _validate_csv_headers(csv_path, required_cols)
     if val_error:
         logging.error(val_error)
