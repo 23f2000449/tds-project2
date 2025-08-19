@@ -43,18 +43,18 @@ else:
 app = FastAPI(title="TDS Project – Data Analyst API")
 
 logging.basicConfig(
-    level=logging.DEBUG,  # DEBUG for detailed logs
+    level=logging.DEBUG,  # DEBUG level for detailed logs
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[logging.StreamHandler(sys.stdout)],
 )
 
-# Exception handler to catch request validation errors (e.g., missing file field)
+# Exception handler for validation errors (missing fields etc)
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     logging.error(f"Request validation error at {request.url}:\n{exc.errors()}")
     return await request_validation_exception_handler(request, exc)
 
-# Global catch-all exception handler to log unexpected errors with stack trace
+# Global exception handler for unexpected errors
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logging.error(f"Unhandled exception processing request {request.url}:\n{traceback.format_exc()}")
@@ -111,46 +111,55 @@ def _call_handler_or_500(handler_name: str, func: Optional[callable], csv_path: 
         raise HTTPException(status_code=500, detail=f"Handler {handler_name} failed: {exc}")
 
 @app.post("/")
-async def analyze_csv(file: Optional[UploadFile] = File(None), request: Request = None) -> Dict[str, Any]:
-    # Log all form fields to diagnose missing 'file' field issues
-    if request is not None:
-        form = await request.form()
-        logging.debug(f"Received form fields: {list(form.keys())}")
+async def analyze_csv(request: Request):
+    form = await request.form()
+    logging.info(f"Received form fields: {list(form.keys())}")
 
-    if file is None:
-        logging.error("Missing file field in request")
+    upload_file = None
+    upload_key = None
+    # Accept any file upload field, not just 'file'
+    for key, value in form.items():
+        if hasattr(value, "filename") and value.filename:
+            upload_file = value
+            upload_key = key
+            break
+
+    if not upload_file:
+        logging.error("No file upload found in request")
         return JSONResponse(
             status_code=400,
-            content={"detail": "Missing file field in request"},
+            content={"detail": "No file upload found in request"},
         )
 
-    filename = file.filename.lower()
-    content_type = file.content_type
-    logging.info(f"Received file: filename={filename}, content_type={content_type}")
+    logging.info(f"Using uploaded file from field '{upload_key}': {upload_file.filename}")
 
-    if "weather" in filename:
-        handler = analyze_weather
-        handler_name = "analyze_weather"
+    filename = upload_file.filename.lower()
+
+    if "network" in filename:
+        handler = analyze_network
+        handler_name = "analyze_network"
     elif "sales" in filename:
         handler = analyze_sales
         handler_name = "analyze_sales"
-    elif "network" in filename:
-        handler = analyze_network
-        handler_name = "analyze_network"
+    elif "weather" in filename:
+        handler = analyze_weather
+        handler_name = "analyze_weather"
     else:
         logging.error(f"Filename '{filename}' does not contain required keywords")
-        raise HTTPException(status_code=400, detail="Filename must contain 'weather', 'sales', or 'network'")
+        return JSONResponse(
+            status_code=400,
+            content={"detail": "Filename must contain 'network', 'sales', or 'weather'."},
+        )
 
-    csv_path = _save_upload_to_temp(file)
+    csv_path = _save_upload_to_temp(upload_file)
 
     try:
         result = _call_handler_or_500(handler_name, handler, csv_path)
     finally:
-        if os.path.exists(csv_path):
-            try:
-                os.remove(csv_path)
-                logging.debug(f"Deleted temporary file {csv_path}")
-            except Exception as e:
-                logging.warning(f"Could not delete temp file {csv_path}: {e}")
+        try:
+            os.remove(csv_path)
+            logging.debug(f"Deleted temporary file {csv_path}")
+        except Exception as e:
+            logging.warning(f"Could not delete temp file {csv_path}: {e}")
 
     return JSONResponse(content=result)
