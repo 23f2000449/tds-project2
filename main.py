@@ -39,22 +39,19 @@ except Exception as e:
 else:
     NETWORK_IMPORT_ERROR = None
 
-# Setup FastAPI app and logging
 app = FastAPI(title="TDS Project – Data Analyst API")
 
 logging.basicConfig(
-    level=logging.DEBUG,  # DEBUG level for detailed logs
+    level=logging.DEBUG,
     format="%(asctime)s [%(levelname)s] %(message)s",
     handlers=[logging.StreamHandler(sys.stdout)],
 )
 
-# Exception handler for validation errors (missing fields etc)
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     logging.error(f"Request validation error at {request.url}:\n{exc.errors()}")
     return await request_validation_exception_handler(request, exc)
 
-# Global exception handler for unexpected errors
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logging.error(f"Unhandled exception processing request {request.url}:\n{traceback.format_exc()}")
@@ -115,14 +112,26 @@ async def analyze_csv(request: Request):
     form = await request.form()
     logging.info(f"Received form fields: {list(form.keys())}")
 
+    # Find the proper CSV upload file based on filename containing target keywords
     upload_file = None
     upload_key = None
-    # Accept any file upload field, not just 'file'
+
     for key, value in form.items():
         if hasattr(value, "filename") and value.filename:
-            upload_file = value
-            upload_key = key
-            break
+            fname = value.filename.lower()
+            if any(keyword in fname for keyword in ["network", "sales", "weather"]):
+                upload_file = value
+                upload_key = key
+                break
+
+    # If no file matches expected keywords, try to fallback on any uploaded file
+    if not upload_file:
+        logging.warning("No matching file found with 'network', 'sales', or 'weather' in filename, searching for any uploaded file")
+        for key, value in form.items():
+            if hasattr(value, "filename") and value.filename:
+                upload_file = value
+                upload_key = key
+                break
 
     if not upload_file:
         logging.error("No file upload found in request")
